@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Patent Detail</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        /* 🔝 NAVBAR */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0f172a;
+            padding: 14px 24px;
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+            font-size: 15px;
+        }
+
+        .nav-links a:hover {
+            color: #60a5fa;
+        }
+
+        /* 📦 CARD */
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        /* 🏷 TITLE */
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        /* 🟢 STATUS BADGE */
+        .badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            color: white;
+            font-size: 12px;
+        }
+
+        .success { background: green; }
+        .danger { background: red; }
+        .pending { background: orange; }
+
+        /* 👨‍⚖️ Attorneys */
+        ul {
+            padding-left: 18px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .empty {
+            color: gray;
+        }
+
+        /* 🔙 BACK BUTTON */
+        .btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 6px 12px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        .btn:hover {
+            background: #1e40af;
+        }
+
+        /* 🏆 Recommendation highlight */
+        .rec-name {
+            color: #2563eb;
+            font-weight: bold;
+        }
+
+        .rec-meta {
+            font-size: 12px;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- 🔝 NAVBAR -->
+<div class="navbar">
+    <div class="logo">Velocity</div>
+
+    <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/patents/">Patent</a>
+        <a href="/recommendations/">Recommendation</a>
+    </div>
+</div>
+
+<!-- 📄 PATENT DETAIL -->
+<div class="card">
+
+    <div class="title">
+        {{ patent.title|default:"No Title Available" }}
+    </div>
+
+    <p><b>Application ID:</b> {{ patent.application_id }}</p>
+
+    <p><b>Applicant:</b> {{ patent.applicant_name|default:"N/A" }}</p>
+
+    <p><b>Inventor:</b> {{ patent.inventor_name|default:"N/A" }}</p>
+
+    <p><b>GAU:</b> {{ patent.gau|default:"N/A" }}</p>
+
+    <p>
+        <b>Status:</b>
+        <span class="badge
+            {% if 'grant' in patent.status|lower %}success
+            {% elif 'reject' in patent.status|lower %}danger
+            {% else %}pending{% endif %}
+        ">
+            {{ patent.status|default:"N/A" }}
+        </span>
+    </p>
+
+</div>
+
+<!-- 👨‍⚖️ ATTORNEYS -->
+<div class="card">
+    <h3>Attorneys</h3>
+
+    {% if attorneys %}
+        <ul>
+            {% for a in attorneys %}
+                <li>
+                    {{ a.name }} ({{ a.registration_no }})
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="empty">No attorneys found.</p>
+    {% endif %}
+</div>
+
+<!-- 🏆 RECOMMENDATIONS -->
+<div class="card">
+    <h3>🏆 Recommended Attorneys (GAU: {{ patent.gau|default:"N/A" }})</h3>
+
+    {% if recommendations %}
+        <ul>
+            {% for r in recommendations %}
+                <li>
+                    <span class="rec-name">
+                        {{ r.attorney.name }} ({{ r.attorney.registration_no }})
+                    </span>
+                    <br>
+                    <span class="rec-meta">
+                        Success: {{ r.success_rate }}% |
+                        Total: {{ r.total_cases }} |
+                        Approved: {{ r.approved }} |
+                        Rejected: {{ r.rejected }}
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="empty">No recommendations available.</p>
+    {% endif %}
+</div>
+
+<!-- 🔙 BACK -->
+<a href="/patents/" class="btn">← Back to Patents</a>
+
+</body>
+</html>
