@@ -22,9 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 GROQ_API_KEY = config("GROQ_API_KEY")
 
-SOLR_BASE_URL = config("SOLR_BASE_URL", default="http://44.214.190.56:7412/solr/triangleipv2/select")
-SOLR_USERNAME = config("SOLR_USERNAME", default="admin")
-SOLR_PASSWORD = config("SOLR_PASSWORD", default="tipuser2023")
+SOLR_BASE_URL = config("SOLR_BASE_URL")
+SOLR_USERNAME = config("SOLR_USERNAME")
+SOLR_PASSWORD = config("SOLR_PASSWORD",)
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-ya6%mzq!r$8n13(vzg0s(!+s!w9ze+p-2z*w-b5p2tzifxf(8u"
 
