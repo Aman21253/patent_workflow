@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,6 +20,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
+GEMINI_API_KEY = config("GEMINI_API_KEY")
+
+SOLR_BASE_URL = config("SOLR_BASE_URL", default="http://44.214.190.56:7412/solr/triangleipv2/select")
+SOLR_USERNAME = config("SOLR_USERNAME", default="admin")
+SOLR_PASSWORD = config("SOLR_PASSWORD", default="tipuser2023")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-ya6%mzq!r$8n13(vzg0s(!+s!w9ze+p-2z*w-b5p2tzifxf(8u"
 

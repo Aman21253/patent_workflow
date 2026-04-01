@@ -7,6 +7,10 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 
 from .models import Patent, Recommendation
+import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from .rag import ask_rag
 
 def patents_page(request):
     patents = Patent.objects.all().prefetch_related("attorneys_map__attorney")[:50]
@@ -47,7 +51,7 @@ def patents_list(request):
 
 
 def patent_detail(request, application_id):
-    patent = Patent.objects.get(application_id=application_id)
+    patent = get_object_or_404(Patent, application_id=application_id)
 
     attorneys = [
         pa.attorney for pa in patent.attorneys_map.select_related("attorney")
@@ -74,3 +78,24 @@ def recommendation_view(request):
         data = Recommendation.objects.all().order_by("-success_rate")[:10]
 
     return render(request, "core/recommendations.html", {"data": data, "gau": gau})
+
+@csrf_exempt
+def chatbot_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+        question = body.get("question", "").strip()
+    except Exception as e:
+        return JsonResponse({"error": f"Invalid JSON: {e}"}, status=400)
+
+    if not question:
+        return JsonResponse({"error": "Question is empty"}, status=400)
+
+    try:
+        answer = ask_rag(question)
+        return JsonResponse({"answer": answer})
+    except Exception as e:
+        print(f"[Chatbot API Error] {e}")
+        return JsonResponse({"error": str(e)}, status=500)
