@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-GEMINI_API_KEY = config("GEMINI_API_KEY")
+GROQ_API_KEY = config("GROQ_API_KEY")
 
 SOLR_BASE_URL = config("SOLR_BASE_URL", default="http://44.214.190.56:7412/solr/triangleipv2/select")
 SOLR_USERNAME = config("SOLR_USERNAME", default="admin")
