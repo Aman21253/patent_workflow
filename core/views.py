@@ -99,3 +99,60 @@ def chatbot_api(request):
     except Exception as e:
         print(f"[Chatbot API Error] {e}")
         return JsonResponse({"error": str(e)}, status=500)
+    
+@csrf_exempt
+def recommend_attorneys_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+        patent_name = body.get("patent_name", "").strip()
+    except Exception as e:
+        return JsonResponse({"error": f"Invalid JSON: {e}"}, status=400)
+
+    if not patent_name:
+        return JsonResponse({"error": "patent_name is required"}, status=400)
+
+    # Search patent by title (fuzzy match)
+    patent = Patent.objects.filter(
+        Q(title__icontains=patent_name) |
+        Q(application_id__icontains=patent_name)
+    ).first()
+
+    if not patent:
+        return JsonResponse({
+            "attorneys": [],
+            "message": f"No patent found matching '{patent_name}'. Try a different name or application ID."
+        })
+
+    # Get attorney recommendations based on GAU
+    recommendations = []
+    if patent.gau:
+        recs = Recommendation.objects.filter(
+            gau=patent.gau
+        ).select_related("attorney").order_by("-success_rate")[:5]
+
+        recommendations = [
+            {
+                "name": rec.attorney.name,  # adjust field name if different
+                "success_rate": float(rec.success_rate),
+            }
+            for rec in recs
+        ]
+
+    # Fallback: attorneys directly assigned to the patent
+    if not recommendations:
+        assigned = [
+            pa.attorney for pa in patent.attorneys_map.select_related("attorney")
+        ]
+        recommendations = [
+            {"name": a.name, "success_rate": 0.0}
+            for a in assigned
+        ]
+
+    return JsonResponse({
+        "patent_title": patent.title,
+        "gau": patent.gau,
+        "attorneys": recommendations,
+    })

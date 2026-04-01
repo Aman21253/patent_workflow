@@ -32,7 +32,6 @@ def extract_keyword(question: str, trigger_words: list[str]) -> str:
     """
     q = question.lower().strip()
 
-    # Remove filler phrases
     fillers = [
         "give me", "show me", "list", "find", "search", "get",
         "tell me", "what is", "what are", "who is", "who are",
@@ -44,11 +43,9 @@ def extract_keyword(question: str, trigger_words: list[str]) -> str:
     for filler in fillers:
         q = q.replace(filler, " ")
 
-    # Remove trigger words themselves
     for word in trigger_words:
         q = q.replace(word, " ")
 
-    # Clean up extra spaces
     q = " ".join(q.split()).strip()
     return q if q else question
 
@@ -60,6 +57,26 @@ def detect_intent(question: str) -> str:
     # ── Specific Application ID (highest priority) ─────────────
     if APP_ID_PATTERN.search(question):
         return "app_id_search"
+
+    # ── ATTORNEY RECOMMENDATION BY PATENT TITLE ────────────────
+    if any(phrase in q for phrase in [
+        "best attorney for",
+        "which attorney for",
+        "which attorney is best for",
+        "recommend attorney for",
+        "suggest attorney for",
+        "attorney for patent",
+        "attorney for method",
+        "attorney for system",
+        "attorney for apparatus",
+        "attorney for device",
+        "who is best attorney",
+        "best attorney to handle",
+        "which attorney should i",
+        "who should handle",
+        "attorney recommendation for",
+    ]):
+        return "attorney_recommendation"
 
     # ── Attorney registration numbers LIST ─────────────────────
     if any(phrase in q for phrase in [
@@ -245,22 +262,122 @@ def ask_rag(user_question: str) -> str:
             docs = get_patents_by_gau(gau, rows=10) if gau else []
             context = build_context(docs)
 
+        # ── ATTORNEY RECOMMENDATION BY PATENT TITLE ───────────
+        elif intent == "attorney_recommendation":
+            # Strip question framing to isolate the patent title
+            stopwords = [
+                "which attorney is best for",
+                "which attorney should i use for",
+                "which attorney should i hire for",
+                "who should handle",
+                "who is best attorney for",
+                "best attorney to handle",
+                "recommend attorney for",
+                "attorney recommendation for",
+                "suggest attorney for",
+                "attorney for patent",
+                "which attorney for",
+                "best attorney for",
+                "attorney for",
+            ]
+
+            title_query = user_question.lower()
+
+            # Remove longest phrases first to avoid partial replacements
+            for sw in sorted(stopwords, key=len, reverse=True):
+                title_query = title_query.replace(sw, "").strip()
+
+            title_query = title_query.strip("?., ").strip()
+
+            if not title_query or len(title_query) < 5:
+                direct_answer = (
+                    "Please provide the patent title you're looking for.\n"
+                    "Example: 'Best attorney for wireless signal transmission system'"
+                )
+            else:
+                # Search Solr by title keywords
+                docs = search_by_query(title_query, rows=3)
+
+                if not docs:
+                    direct_answer = (
+                        f"No patent found matching '{title_query}'. "
+                        "Try rephrasing the title or use the Application ID."
+                    )
+                else:
+                    doc = docs[0]
+
+                    def get_field(d, field):
+                        val = d.get(field, "N/A")
+                        if isinstance(val, list):
+                            return ", ".join(str(v) for v in val)
+                        return str(val) if val else "N/A"
+
+                    patent_title = get_field(doc, "title")
+                    gau          = get_field(doc, "gau")
+                    app_id       = get_field(doc, "id")
+                    attorneys    = doc.get("all_attorney_names", [])
+                    reg_nos      = doc.get("all_attorney_registration_numbers", [])
+
+                    # Try DB Recommendation model first (ranked by success rate)
+                    try:
+                        from .models import Recommendation
+                        recs = Recommendation.objects.filter(
+                            gau=gau
+                        ).select_related("attorney").order_by("-success_rate")[:5]
+
+                        if recs:
+                            lines = [
+                                f"Best attorneys for: '{patent_title}'",
+                                f"Application ID : {app_id}",
+                                f"GAU            : {gau}",
+                                f"(Ranked by success rate in this technology group)\n",
+                            ]
+                            for i, r in enumerate(recs, 1):
+                                lines.append(
+                                    f"{i}. {r.attorney.name} "
+                                    f"(Reg: {r.attorney.registration_no}) "
+                                    f"— Success Rate: {r.success_rate}%"
+                                )
+                            direct_answer = "\n".join(lines)
+
+                    except Exception as e:
+                        print(f"[DB Recommendation Error] {e}")
+
+                    # Fallback: attorneys listed directly on the Solr patent doc
+                    if not direct_answer:
+                        if attorneys:
+                            names_list = attorneys if isinstance(attorneys, list) else [attorneys]
+                            regs_list  = reg_nos   if isinstance(reg_nos,  list) else [reg_nos]
+                            lines = [
+                                f"Attorneys on patent: '{patent_title}'",
+                                f"Application ID : {app_id}",
+                                f"GAU            : {gau}\n",
+                            ]
+                            for i, name in enumerate(names_list, 1):
+                                reg = regs_list[i - 1] if i - 1 < len(regs_list) else "N/A"
+                                lines.append(f"{i}. {name} (Reg: {reg})")
+                            direct_answer = "\n".join(lines)
+                        else:
+                            direct_answer = (
+                                f"Patent found: '{patent_title}' "
+                                f"(App ID: {app_id}, GAU: {gau}), "
+                                "but no attorneys are listed for it."
+                            )
+
         # ── SPECIFIC ATTORNEY NAME SEARCH ──────────────────────
         elif intent == "attorney_name_search":
             keyword = extract_keyword(
                 user_question,
                 ["attorney", "lawyer", "counsel", "patent", "find", "search"]
             )
-            # Only search if we have a meaningful name keyword (not empty/short)
             if keyword and len(keyword) > 2:
                 docs = get_patents_by_attorney_name(keyword, rows=10)
                 context = build_context(docs)
             else:
-                # Fallback: return sample attorney names
                 names = get_all_attorney_names(rows=100)
                 preview = names[:20]
                 direct_answer = (
-                    f"Here are some attorney names from the database:\n\n" +
+                    "Here are some attorney names from the database:\n\n" +
                     "\n".join(f"{i+1}. {n}" for i, n in enumerate(preview)) +
                     "\n\nTip: Ask about a specific attorney by name, e.g. 'Patents by Kevin Costanza'"
                 )
